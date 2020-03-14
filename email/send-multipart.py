@@ -11,7 +11,7 @@ from email.header import Header
 from email import encoders
 
 mailsv = 'localhost'
-port = 10025
+port = 10587
 
 envelope_from = 'hello@example.com'
 to_addr = 'hello@example.jp'

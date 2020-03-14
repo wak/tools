@@ -1,15 +1,8 @@
 #! /usr/bin/env python3
 
-## 設定 ##########################
-# メールを転送する？
-RELAY_EMAIL = False
-
-# SMTP認証ID
-MAIL_ADDRESS = ''
-
-# SMTP認証パスワード
-MAIL_PASSWORD = ''
-##################################
+import os
+import re
+import configparser
 
 import smtpd
 import asyncore
@@ -17,58 +10,29 @@ import asyncore
 import email.parser
 import quopri
 
-import ssl
 import smtplib
-
-import re
 
 from pprint import pprint
 import traceback
 
 class MySMTPServer(smtpd.SMTPServer):
+    def __init__(self, local_tuple, config):
+        super().__init__(local_tuple, None)
+        self._config = config
+    
     def process_message(self, peer, mailfrom, rcpttos, data, **kwargs):
         try:
-            self._describe_email(peer, mailfrom, rcpttos, data, **kwargs)
-            if RELAY_EMAIL:
+            MessageInspector.inspect_from_bytes(data, mailfrom)
+            if self._config.relay_email:
                 self._relay_to_office365(mailfrom, rcpttos, data)
         except Exception as e:
             traceback.print_exc()
-    
-    def _describe_email(self, peer, mailfrom, rcpttos, data, **kwargs):
-        print("=" * 80)
-        print("[%s]\n  %s" % ('Envelope From', mailfrom))
-
-        print("[HEADERS]")
-        msg = email.message_from_bytes(data)
-        for key, value in msg.items():
-            print("  %-25s: %s" % (key, self._decode_header(value)))
-
-        if msg.is_multipart():
-            for payload in msg.get_payload():
-                charset = payload.get_content_charset()
-                if payload.get_filename() is None:
-                    print("[BODY]")
-                    body = payload.get_payload(None, True).decode(charset)
-                    print(re.sub(r'^', "  ", body, flags=re.MULTILINE))
-                else:
-                    print("[Attachment] ", self._decode_header(payload.get_filename()))
-        else:
-            print("[BODY]")
-            charset = msg.get_content_charset()
-            body = msg.get_payload(None, True).decode(charset)
-            print(re.sub(r'^', "  ", body, flags=re.MULTILINE))
-
-        print("=" * 80)
-
-    def _decode_header(self, header_value):
-        return ''.join([v if type(v) is str else v.decode(cset) for (v, cset) in email.header.decode_header(header_value)])
-
 
     def _overwrite_sender(self, data):
         msg = email.message_from_bytes(data)
-        if msg['From'] != MAIL_ADDRESS:
-            print('overwrite From header %s => %s' % (msg['From'], MAIL_ADDRESS))
-            msg['From'] = MAIL_ADDRESS
+        if msg['From'] != self._config.smtp_auth_id:
+            print('overwrite From header %s => %s' % (msg['From'], self._config.smtp_auth_id))
+            msg['From'] = self._config.smtp_auth_id
 
         return msg.as_string()
 
@@ -76,15 +40,92 @@ class MySMTPServer(smtpd.SMTPServer):
         smtp = smtplib.SMTP('smtp.office365.com', 587)
         smtp.ehlo()
         smtp.starttls()
-        smtp.login(MAIL_ADDRESS, MAIL_PASSWORD)
+        smtp.login(self._config.smtp_auth_id, self._config.smtp_auth_password)
         smtp.ehlo()
-        smtp.sendmail(MAIL_ADDRESS, rcpttos, self._overwrite_sender(data))
+        smtp.sendmail(self._config.smtp_auth_id, rcpttos, self._overwrite_sender(data))
         smtp.close()
 
         print('Relay ... OK.')
 
+class MessageInspector(object):
+    def __init__(self, message, envelope_from):
+        self._message = message
+        self._envelope_from = envelope_from
+    
+    @staticmethod
+    def inspect_from_bytes(message_bytes, envelope_from):
+        msg = email.message_from_bytes(message_bytes)
+        MessageInspector(msg, envelope_from).inspect()
+
+    def inspect(self):
+        print("=" * 80)
+
+        self._inspect_envelope_from()
+        self._inspect_headers()
+        
+        if self._message.is_multipart():
+            self._inspect_multi_part()
+        else:
+            self._inspect_single_part()
+
+        print("=" * 80)
+
+    def _inspect_envelope_from(self):
+        print("[%s]\n  %s" % ('Envelope From', self._envelope_from))
+        
+    def _inspect_headers(self):
+        print("[HEADERS]")
+        for key, value in self._message.items():
+            print("  %-25s: %s" % (key, self._decode_header(value)))
+
+    def _inspect_multi_part(self):
+        for payload in self._message.get_payload():
+            charset = payload.get_content_charset()
+            if payload.get_filename() is None:
+                print("[BODY]")
+                body = payload.get_payload(None, True).decode(charset or 'utf-8')
+                print(re.sub(r'^', "  ", body, flags=re.MULTILINE))
+            else:
+                print("[Attachment] ", self._decode_header(payload.get_filename()))
+
+    def _inspect_single_part(self):
+        print("[BODY]")
+        charset = self._message.get_content_charset()
+        body = self._message.get_payload(None, True).decode(charset or 'utf-8')
+        print(re.sub(r'^', "  ", body, flags=re.MULTILINE))
+
+    def _decode_header(self, header_value):
+        return ''.join([v if type(v) is str else v.decode(cset or 'utf-8')
+                        for (v, cset) in email.header.decode_header(header_value)])
+
+class Config(object):
+    def __init__(self):
+        config = configparser.ConfigParser()
+        config_file = os.path.abspath(os.path.join(os.path.dirname(__file__), 'smtp-server.conf'))
+
+        with open(config_file) as f:
+            config.read_file(f)
+
+        section = config['smtp-server']
+        self.relay_email = section.getboolean('RELAY_EMAIL', False)
+        self.smtp_auth_id = section.get('SMTP_AUTH_ID')
+        self.smtp_auth_password = section.get('SMTP_AUTH_PASSWORD', '')
+
+        # self.dump()
+
+    def dump(self):
+        print('[CONFIG]')
+        print('  Relay: ' + str(self.relay_email))
+        print('  ID   : ' + self.smtp_auth_id)
+        print('  Pass : ' + self.smtp_auth_password)
+
 def main():
-    sv = MySMTPServer(('localhost', 10025), None)
-    asyncore.loop()
+    try:
+        config = Config()
+        sv = MySMTPServer(('localhost', 10587), config)
+        print("Dummy SMTP Server started.")
+        asyncore.loop()
+    except KeyboardInterrupt:
+        pass
 
 main()

@@ -7,7 +7,7 @@ from email.mime.text import MIMEText
 from email.utils import formatdate
 
 mailsv = 'localhost'
-port = 10025
+port = 10587
 
 envelope_from = 'hello@example.com'
 to_addr = 'hello@example.jp'

@@ -111,7 +111,7 @@ class MessageInspector(object):
 class Config(object):
     def __init__(self):
         config = configparser.ConfigParser()
-        config_file = os.path.abspath(os.path.join(os.path.dirname(__file__), 'smtp-server.conf'))
+        config_file = os.path.abspath(os.path.join(os.path.dirname(__file__), 'smtp_server.conf'))
 
         with open(config_file) as f:
             config.read_file(f)

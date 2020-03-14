@@ -13,9 +13,11 @@ from email import encoders
 mailsv = 'localhost'
 port = 10587
 
-envelope_from = 'hello@example.com'
-to_addr = 'hello@example.jp'
-from_addr = 'hello@example.jp'
+envelope_from = 'hello-ef@example.com'
+rcpt_to = 'hello-rcpt@example.jp'
+
+to_addr = 'hello-hdr@example.jp'
+from_addr = 'hello-hdr@example.com'
 
 body = "テスト\n\nあいうえお"
 
@@ -47,5 +49,5 @@ mime.attach(part)
 
 smtp = smtplib.SMTP(mailsv, port)
 smtp.ehlo()
-smtp.sendmail(envelope_from, to_addr, mime.as_string())
+smtp.sendmail(envelope_from, rcpt_to, mime.as_string())
 smtp.close()

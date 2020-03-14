@@ -22,7 +22,8 @@ class MySMTPServer(smtpd.SMTPServer):
     
     def process_message(self, peer, mailfrom, rcpttos, data, **kwargs):
         try:
-            MessageInspector.inspect_from_bytes(data, mailfrom)
+            pprint(rcpttos)
+            MessageInspector.inspect_from_bytes(mailfrom, rcpttos, data)
             if self._config.relay_email:
                 self._relay_to_office365(mailfrom, rcpttos, data)
         except Exception as e:
@@ -48,19 +49,21 @@ class MySMTPServer(smtpd.SMTPServer):
         print('Relay ... OK.')
 
 class MessageInspector(object):
-    def __init__(self, message, envelope_from):
-        self._message = message
+    def __init__(self, envelope_from, rcpt_tos, message):
         self._envelope_from = envelope_from
+        self._rcpt_tos = rcpt_tos
+        self._message = message
     
     @staticmethod
-    def inspect_from_bytes(message_bytes, envelope_from):
+    def inspect_from_bytes(envelope_from, rcpt_tos, message_bytes):
         msg = email.message_from_bytes(message_bytes)
-        MessageInspector(msg, envelope_from).inspect()
+        MessageInspector(envelope_from, rcpt_tos, msg).inspect()
 
     def inspect(self):
         print("=" * 80)
 
         self._inspect_envelope_from()
+        self._inspect_rcpt_tos()
         self._inspect_headers()
         
         if self._message.is_multipart():
@@ -72,6 +75,11 @@ class MessageInspector(object):
 
     def _inspect_envelope_from(self):
         print("[%s]\n  %s" % ('Envelope From', self._envelope_from))
+
+    def _inspect_rcpt_tos(self):
+        print("[RCPT TO]")
+        for rcpt_to in self._rcpt_tos:
+            print("  %s" % (rcpt_to))
         
     def _inspect_headers(self):
         print("[HEADERS]")

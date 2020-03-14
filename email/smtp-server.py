@@ -65,11 +65,7 @@ class MessageInspector(object):
         self._inspect_envelope_from()
         self._inspect_rcpt_tos()
         self._inspect_headers()
-        
-        if self._message.is_multipart():
-            self._inspect_multi_part()
-        else:
-            self._inspect_single_part()
+        self._inspect_body()
 
         print("=" * 80)
 
@@ -85,6 +81,12 @@ class MessageInspector(object):
         print("[HEADERS]")
         for key, value in self._message.items():
             print("  %-25s: %s" % (key, self._decode_header(value)))
+
+    def _inspect_body(self):
+        if self._message.is_multipart():
+            self._inspect_multi_part()
+        else:
+            self._inspect_single_part()
 
     def _inspect_multi_part(self):
         for payload in self._message.get_payload():
@@ -136,4 +138,5 @@ def main():
     except KeyboardInterrupt:
         pass
 
-main()
+if __name__ == "__main__":
+    main()

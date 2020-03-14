@@ -22,7 +22,6 @@ class MySMTPServer(smtpd.SMTPServer):
     
     def process_message(self, peer, mailfrom, rcpttos, data, **kwargs):
         try:
-            pprint(rcpttos)
             MessageInspector.inspect_from_bytes(mailfrom, rcpttos, data)
             if self._config.relay_email:
                 self._relay_to_office365(mailfrom, rcpttos, data)

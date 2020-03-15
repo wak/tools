@@ -56,7 +56,7 @@ class MySMTPServer(smtpd.SMTPServer):
 class MySSL(object):
     def __init__(self):
         self.context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-        self.context.load_cert_chain('keys/server.crt', keyfile='keys/server.key')
+        self.context.load_cert_chain(filepath('keys/server.crt'), keyfile=filepath('keys/server.key'))
 
     def wrap(self, socket):
         return self.context.wrap_socket(socket, server_side=True)
@@ -87,7 +87,7 @@ class MyExtendedSMTPChannel(smtpd.SMTPChannel):
     def smtp_AUTH(self, arg):
         # SMTPChannelの実装上、PLAIN認証以外は実装不可能。
         # AUTHコマンドの中で複数回の通信が必要になるが、それが可能な作りになっていない。
-        # PLAIN認証は、1度の通信で認証可能のため実装可能。
+        # PLAIN認証は、1度の通信で認証可能なため実装可能。
         self.push('235 Authentication successful')
 
     def smtp_STARTTLS(self, arg):
@@ -163,7 +163,7 @@ class Config(object):
         if len(sys.argv) > 1:
             config_file = sys.argv[1]
         else:
-            config_file = os.path.abspath(os.path.join(os.path.dirname(__file__), 'smtp_server.conf'))
+            config_file = filepath('smtp_server.conf')
 
         with open(config_file) as f:
             config.read_file(f)
@@ -182,6 +182,9 @@ class Config(object):
         print('  ID   : ' + self.smtp_auth_id)
         print('  Pass : ' + self.smtp_auth_password)
         print('  EXTENDED IMPL: ' + str(self.use_extended_smtp_impl))
+
+def filepath(relpath):
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), relpath))
 
 def main():
     try:

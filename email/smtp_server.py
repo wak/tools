@@ -1,4 +1,5 @@
 #! /usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 import os
 import sys
@@ -165,7 +166,7 @@ class Config(object):
         else:
             config_file = filepath('smtp_server.conf')
 
-        with open(config_file) as f:
+        with open(config_file, encoding='utf-8') as f:
             config.read_file(f)
 
         section = config['smtp-server']

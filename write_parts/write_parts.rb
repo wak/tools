@@ -70,19 +70,12 @@ module WriteParts
     def out(*args)
       @file.puts(*args)
     end
-
-    
-    module ClassMethods
-      def build(map)
-        self.new(map).__build
-      end
-    end
   end
 
   class SingleFileBase
     include WriteHelper
     
-    def initialize(context)
+    def initialize(context = nil)
       @context = context
       @filepath = nil
       helper_setup
@@ -110,7 +103,7 @@ module WriteParts
   class MultiFileBase
     include WriteHelper
     
-    def initialize(context)
+    def initialize(context = nil)
       @context = context
       helper_setup
       post_initialize
